@@ -54,7 +54,8 @@ def handle_login():
             # if there is no user record
             else:
                 return Response(
-                    response=json.dumps({'status': False, "message": "User Record doesn't exist, kindly register"}),
+                    response=json.dumps({'status': False, 
+                        "message": "User Record doesn't exist, kindly register"}),
                     status=404,
                     mimetype='application/json'
                 ) 
