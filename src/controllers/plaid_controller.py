@@ -129,10 +129,13 @@ def exchange_public_token(auth_data):
                 "plaid_token": plaid_token
             }
             result_json = {"accounts":[], "transactions":[]}
-
+            print(1)
             accounts_get_request = AccountsGetRequest(access_token=access_token)
+            print(2)
             response = client.accounts_get(accounts_get_request)
+            print(3)
             accounts = response['accounts']
+            print(4)
             for account in accounts:
                 result_json["accounts"].append({
                     "name": account["name"],
@@ -141,15 +144,21 @@ def exchange_public_token(auth_data):
                     "current_balance": account["balances"]["current"],
                     "currency": account["balances"]["iso_currency_code"]
                 })
+            print(5)
             transactions_get_request = TransactionsGetRequest(
                 access_token=access_token,
                 start_date=date(2023,1,1),
                 end_date=date.today()
             )
+            print(6)
             try:
+                print(7)
                 response = client.transactions_get(transactions_get_request)
+                print(8)
                 transactions = response['transactions']
+                print(9)
             except ApiException as e:
+                print(10)
                 print(e)
             for transaction in transactions:
                 result_json["transactions"].append({
@@ -158,8 +167,11 @@ def exchange_public_token(auth_data):
                     "amount": transaction["amount"],
                     "category": str(transaction["category"])
                 })
+            print(11)
             user_obj.plaid_data = result_json
+            print(12)
             db.session.commit()
+            print(13)
             return Response(
                 response=json.dumps({
                     'status': True, 
