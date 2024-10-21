@@ -14,6 +14,7 @@ from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
 from plaid.model.accounts_get_request import AccountsGetRequest
+from plaid.model.transactions_sync_request import TransactionsSyncRequest
 from plaid.model.transactions_get_request import TransactionsGetRequest
 from plaid.model.transactions_get_request_options import TransactionsGetRequestOptions
 from plaid.model.transactions_refresh_request import TransactionsRefreshRequest
@@ -113,8 +114,6 @@ def exchange_public_token(auth_data):
                 public_token=public_token
             )
             response = client.item_public_token_exchange(public_token_exchange_request)
-            # These values should be saved to a persistent database and
-            # associated with the currently signed-in user
             access_token = response['access_token']
             item_id = response['item_id']
             user_obj.plaid_access_key = access_token
@@ -128,14 +127,10 @@ def exchange_public_token(auth_data):
             payload = {
                 "plaid_token": plaid_token
             }
-            result_json = {"accounts":[], "transactions":[]}
-            print(1)
+            result_json = {"accounts":[], "transactions":{"added":[], "modified":[], "removed":[]}}
             accounts_get_request = AccountsGetRequest(access_token=access_token)
-            print(2)
             response = client.accounts_get(accounts_get_request)
-            print(3)
             accounts = response['accounts']
-            print(4)
             for account in accounts:
                 result_json["accounts"].append({
                     "name": account["name"],
@@ -144,34 +139,44 @@ def exchange_public_token(auth_data):
                     "current_balance": account["balances"]["current"],
                     "currency": account["balances"]["iso_currency_code"]
                 })
-            print(5)
-            transactions_get_request = TransactionsGetRequest(
-                access_token=access_token,
-                start_date=date(2023,1,1),
-                end_date=date.today()
-            )
-            print(6)
-            try:
-                print(7)
-                response = client.transactions_get(transactions_get_request)
-                print(8)
-                transactions = response['transactions']
-                print(9)
-            except ApiException as e:
-                print(10)
-                print(e)
-            for transaction in transactions:
-                result_json["transactions"].append({
-                    "date": str(transaction['date']),
-                    "description": str(transaction["merchant_name"]),
-                    "amount": transaction["amount"],
-                    "category": str(transaction["category"])
-                })
-            print(11)
+            cursor = ""
+            has_more = True
+            while has_more:
+                transaction_sync_request = TransactionsSyncRequest(
+                    access_token=access_token,
+                    cursor=cursor,
+                )
+                try:
+                    response = client.transactions_sync(transaction_sync_request)
+                    for item in response["added"]:
+                        result_json["transactions"]["added"].append({
+                            "account_id": str(item["account_id"]),
+                            "date": str(item["date"]),
+                            "description": str(item["merchant_name"]),
+                            "amount": item["amount"],
+                            "category": str(item["category"]),
+                            "transaction_id": str(item["transaction_id"])
+                        })
+                    for item in response["modified"]:
+                        result_json["transactions"]["modified"].append({
+                            "account_id": str(item["account_id"]),
+                            "date": str(item["date"]),
+                            "description": str(item["merchant_name"]),
+                            "amount": item["amount"],
+                            "category": str(item["category"]),
+                            "transaction_id": str(item["transaction_id"])
+                        })
+                    for item in response["removed"]:
+                        result_json["transactions"]["removed"].append({
+                            "account_id": str(item["account_id"]),
+                            "transaction_id": str(item["transaction_id"])
+                        })
+                    has_more = response['has_more']
+                    cursor = response['next_cursor']
+                except ApiException as e:
+                    print(e)
             user_obj.plaid_data = result_json
-            print(12)
             db.session.commit()
-            print(13)
             return Response(
                 response=json.dumps({
                     'status': True, 
