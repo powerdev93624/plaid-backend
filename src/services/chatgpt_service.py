@@ -5,6 +5,7 @@ from src import db
 from openai import OpenAI
 import httpx
 
+
 def get_answer_from_chatgpt(user_id, user_message):
     user_obj = User.query.get(user_id)
     if user_obj:
